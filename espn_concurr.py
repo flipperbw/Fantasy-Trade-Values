@@ -20,7 +20,8 @@ re_proc = re.compile("Processed$")
 re_add = re.compile("(Add$|Add \(Waivers\)$)")
 pool = HTTPConnectionPool('games.espn.go.com', maxsize=100)
 
-for league in range(75000,150000):
+#for league in range(75000, 150000):
+for league in range(660947,660949):
 	
 	r = pool.request('GET', '/ffl/recentactivity', fields={'leagueId':league, 'seasonId':'2012', 'activityType':'2', 'startDate':'20120901', 'teamId':'-1', 'tranType':'-3'})
 	pagesoup = BeautifulSoup(r.data)	
@@ -64,7 +65,7 @@ for league in range(75000,150000):
 				i = len(playerlist1) - len(playerlist2)
 				for sib in tradeinfo.find_all_previous(text=re_add):
 					sibtext = sib.find_parent("td").next_sibling
-					if re.search('^' + team1, sibtext.text):
+					if re.search('^' + re.escape(team1), sibtext.text):
 						playerlist2.append('++' + sibtext.find('b').text)
 						i -= 1
 					if i == 0:
@@ -74,7 +75,7 @@ for league in range(75000,150000):
 				i = len(playerlist2) - len(playerlist1)
 				for sib in tradeinfo.find_all_previous(text=re_add):
 					sibtext = sib.find_parent("td").next_sibling
-					if re.search('^' + team2, sibtext.text):
+					if re.search('^' + re.escape(team2), sibtext.text):
 						playerlist1.append('++' + sibtext.find('b').text)
 						i -= 1
 					if i == 0:
