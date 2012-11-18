@@ -1,0 +1,68 @@
+# start 20 aws based on the AMI image. quick-start-1
+./getaws.py | paste -s --delimiter=" "
+
+i=1; for a in `seq 1 20`; do let j=i+60000; sed -e "s/(75000,150000)/($i,$j)/" espn_concurr.py > espn_concurr$a.py; let i=i+60000; done;
+
+a=1; for serv in LISTHERE; do scp -o "StrictHostKeyChecking=no" -i Desktop/Shared/brettkey.pem espn_concurr$a.py ec2-user@$serv:~; ssh -f -i Desktop/Shared/brettkey.pem ec2-user@$serv "chmod 755 ./espn_concurr$a.py && ./espn_concurr$a.py > results$a && touch alldone"; let a=a+1; done;
+
+ssh -i Desktop/Shared/brettkey.pem ec2-user@ec2-50-17-69-44.compute-1.amazonaws.com
+
+## WAIT HERE
+
+a=1; for serv in LISTHERE; do echo $a; ssh -i Desktop/Shared/brettkey.pem ec2-user@$serv "[ -f alldone ] && echo yeah"; let a=a+1; done;
+
+a=1; for serv in LISTHERE; do scp -i Desktop/Shared/brettkey.pem ec2-user@$serv:~/results$a .; let a=a+1; done;
+
+cat results* > totalresults
+
+egrep -v 'TQB|Coach' totalresults | egrep -v 'Round Draft Pick' | sed '/|$/d' | sed 's/\+\+//g' | sed 's/\*//g' > totalresults_edited
+egrep -v 'TQB|Coach' totalresults | egrep -v 'Round Draft Pick' | sed '/|$/d' | sed 's/\*//g' > totalresults_edited_plus
+#prolly dont need $ anymore. also could take out small dudes here, but probably not.
+#can make tqb = qb
+# get rid of uneven trades...
+# x = open('results13a', 'r')
+#for line in x:
+#    a= line.split("|")[-2]
+#    b= line.split("|")[-1]
+#    if len(a.split(",")) != len(b.split(",")):
+#        print line
+python removeuneven.py > totalresults_edited_minuneven
+
+awk '{gsub(/,\+\+[^,|]*/,"")}; 1' totalresults_edited_plus | awk '!/\|\+\+/' > totalresults_edited_plus_noplus;
+
+# 01:14:47 ~ $ WARNING:root:Some characters could not be decoded, and were replaced with REPLACEMENT CHARACTER.
+# check my league with the music symbol
+
+#Traceback (most recent call last):
+#  File "./espn_concurr3.py", line 38, in <module>
+#    tradedate = months[dateinfo.contents[0].split(', ')[1].split()[0]] + dateinfo.contents[0].split(', ')[1].split()[1]
+#AttributeError: 'NoneType' object has no attribute 'contents'
+#212555
+
+#value over time
+
+#deviation of trade from expected value?
+
+#my Tom Brady for his Harvin/Romo. It was pretty close but after adding the 50% to Brady's score, it gave the advantage to my trading partner. Still, I made this trade in week 2 and Harvin's value has increased so that may be why.
+
+egrep '\|(5|6|7|8|9|10)\|' totalresults_edited  > totalresults_edited_laterweeks
+egrep '\|PPR\|' totalresults_edited > totalresults_edited_ppr
+egrep '\|PPR\|' totalresults_edited_laterweeks > totalresults_edited_laterweeks_ppr
+egrep '\|Standard\|' totalresults_edited > totalresults_edited_standard
+egrep '\|Standard\|' totalresults_edited_laterweeks > totalresults_edited_laterweeks_standard
+
+#maybe separate ppr
+#is it posible to weight older weeks lower?
+./matrix_espn.py totalresults_edited | sort -n -k2 -t',' > slns
+./matrix_espn.py totalresults_edited_ppr | sort -n -k2 -t',' > slns_ppr
+./matrix_espn.py totalresults_edited_standard | sort -n -k2 -t',' > slns_standard
+./matrix_espn.py totalresults_edited_laterweeks | sort -n -k2 -t',' > slns_laterweeks
+./matrix_espn.py totalresults_edited_laterweeks_ppr | sort -n -k2 -t',' > slns_laterweeks_ppr
+./matrix_espn.py totalresults_edited_laterweeks_standard | sort -n -k2 -t',' > slns_laterweeks_standard
+
+egrep -f good_players slns
+#or
+cp slns slns_bu
+mx=5; slfile=slns_ppr; bgfile=totalresults_edited; for p in $(cut -d',' -f1 $slfile); do let n=$(grep $p $bgfile | wc -l); if [ $n -le $mx ] ; then sed -i -e '/$p/d' $slfile; fi; done;
+sed 's/ /_/g' totalresults_edited_laterweeks_standard > totalresults_edited_laterweeks_standard_sed; sed 's/ /_/g' slns_laterweeks_standard > slns_laterweeks_standard_sed; slfile=slns_laterweeks_standard_sed; bgfile=totalresults_edited_laterweeks_standard_sed; for p in $(cut -d',' -f1 $slfile); do let n=$(grep $p $bgfile | wc -l); sed -i -e "s%\($p.*\)$%\1,$n%" $slfile; done;
+while read line; do let c=$(echo $line | cut -d',' -f3); if [ $c -ge 100 ] ; then echo $line; fi; done < slns_laterweeks_standard_sed ; > w
